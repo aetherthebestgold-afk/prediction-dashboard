@@ -35,16 +35,19 @@ export default function DashboardPage() {
   const [prices, setPrices] = useState<PricePoint[]>([])
   const [loading, setLoading] = useState(true)
   const [timeframe, setTimeframe] = useState('1h')
+  const [trading, setTrading] = useState<any>(null)
 
   useEffect(() => {
     const fetchData = () => {
       Promise.all([
         fetch('/api/backtest').then(r => r.json().catch(() => null)),
         fetch('/api/btc').then(r => r.json().catch(() => [])),
+        fetch('/api/trading').then(r => r.json().catch(() => null)),
       ])
-        .then(([bt, btc]) => {
+        .then(([bt, btc, tr]) => {
           setBacktest(bt)
           setPrices(Array.isArray(btc) ? btc : [])
+          setTrading(tr)
           setLoading(false)
         })
         .catch(() => setLoading(false))
@@ -269,6 +272,75 @@ export default function DashboardPage() {
                 </div>
               </motion.div>
             ))}
+          </motion.div>
+        )}
+
+        {/* Trading Account */}
+        {trading && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="mt-8"
+          >
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
+              {[
+                { label: 'Equity', value: `$${trading.account.equity.toFixed(2)}`, sub: 'Account', color: trading.account.pnl >= 0 ? 'text-green-600' : 'text-red-600' },
+                { label: 'P&L', value: `$${trading.account.pnl >= 0 ? '+' : ''}${trading.account.pnl.toFixed(2)}`, sub: 'Since start', color: trading.account.pnl >= 0 ? 'text-green-600' : 'text-red-600' },
+                { label: 'Win Rate', value: `${trading.stats.win_rate}%`, sub: `${trading.stats.won}W / ${trading.stats.lost}L`, color: '' },
+                { label: 'Total Trades', value: trading.stats.total_trades, sub: `${trading.stats.open_count} open`, color: '' },
+                { label: 'Status', value: trading.stats.open_count > 0 ? '🔴 In Trade' : '🟢 Ready', sub: trading.stats.open_count > 0 ? `${trading.open_trades[0]?.direction?.toUpperCase() || ''}` : 'No open', color: '' },
+              ].map((s, i) => (
+                <div key={s.label} className="p-4 rounded-xl border border-black/10 dark:border-white/10">
+                  <div className="text-xs text-black/40 dark:text-white/40">{s.label}</div>
+                  <div className={`text-xl font-bold tabular-nums ${s.color || ''}`}>{s.value}</div>
+                  <div className="text-xs text-black/30 dark:text-white/30">{s.sub}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Open Trade */}
+            {trading.open_trades.length > 0 && (
+              <div className="p-4 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 mb-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">🔵 Open Position:</span>
+                  <span className="text-sm font-bold uppercase">{trading.open_trades[0].direction}</span>
+                  <span className="text-xs text-black/40 dark:text-white/40">${trading.open_trades[0].amount} at ${Number(trading.open_trades[0].btc_entry).toLocaleString()}</span>
+                  <span className="text-xs text-black/40 dark:text-white/40 ml-auto">{new Date(trading.open_trades[0].opened_at).toLocaleTimeString('tr-TR')}</span>
+                </div>
+                <div className="text-xs text-black/50 dark:text-white/50 mt-1 italic">{trading.open_trades[0].reasoning}</div>
+              </div>
+            )}
+
+            {/* Closed Trade Journal */}
+            {trading.closed_trades.length > 0 && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-left text-black/40 dark:text-white/40 border-b border-black/10 dark:border-white/10">
+                      <th className="pb-2 font-medium">Time</th>
+                      <th className="pb-2 font-medium">Dir</th>
+                      <th className="pb-2 font-medium">Entry</th>
+                      <th className="pb-2 font-medium">Exit</th>
+                      <th className="pb-2 font-medium">PnL</th>
+                      <th className="pb-2 font-medium">Reasoning</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {trading.closed_trades.map((t: any, i: number) => (
+                      <tr key={i} className="border-b border-black/5 dark:border-white/5">
+                        <td className="py-1.5 tabular-nums">{new Date(t.opened_at).toLocaleTimeString('tr-TR')}</td>
+                        <td className={`py-1.5 font-medium uppercase ${t.direction === 'up' ? 'text-green-600' : 'text-red-600'}`}>{t.direction}</td>
+                        <td className="py-1.5 tabular-nums">${Number(t.btc_entry).toLocaleString()}</td>
+                        <td className="py-1.5 tabular-nums">${Number(t.btc_exit || 0).toLocaleString()}</td>
+                        <td className={`py-1.5 font-medium tabular-nums ${Number(t.pnl) >= 0 ? 'text-green-600' : 'text-red-600'}`}>${Number(t.pnl) >= 0 ? '+' : ''}{Number(t.pnl).toFixed(2)}</td>
+                        <td className="py-1.5 text-black/40 dark:text-white/40 max-w-40 truncate">{t.reasoning || ''}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </motion.div>
         )}
 
