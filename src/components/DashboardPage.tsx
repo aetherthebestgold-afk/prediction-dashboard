@@ -37,16 +37,22 @@ export default function DashboardPage() {
   const [timeframe, setTimeframe] = useState('1h')
 
   useEffect(() => {
-    Promise.all([
-      fetch('/api/backtest').then(r => r.json().catch(() => null)),
-      fetch('/api/btc').then(r => r.json().catch(() => [])),
-    ])
-      .then(([bt, btc]) => {
-        setBacktest(bt)
-        setPrices(Array.isArray(btc) ? btc : [])
-        setLoading(false)
-      })
-      .catch(() => setLoading(false))
+    const fetchData = () => {
+      Promise.all([
+        fetch('/api/backtest').then(r => r.json().catch(() => null)),
+        fetch('/api/btc').then(r => r.json().catch(() => [])),
+      ])
+        .then(([bt, btc]) => {
+          setBacktest(bt)
+          setPrices(Array.isArray(btc) ? btc : [])
+          setLoading(false)
+        })
+        .catch(() => setLoading(false))
+    }
+
+    fetchData()
+    const interval = setInterval(fetchData, 30000) // Refresh every 30s
+    return () => clearInterval(interval)
   }, [])
 
   if (loading) {
